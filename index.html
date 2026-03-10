@@ -3,22 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Snake</title>
+  <title>Tetris</title>
   <style>
     :root {
-      --bg: #101820;
-      --panel: #172634;
-      --grid: #22384a;
-      --snake: #facc15;
-      --head: #fde047;
-      --food: #ff6b6b;
-      --rock: #94a3b8;
-      --car: #38bdf8;
-      --car-dark: #0f172a;
-      --thunder-warn: #f59e0b;
-      --thunder-hit: #a855f7;
-      --text: #f1f5f9;
-      --muted: #9fb0bd;
+      --bg-top: #132034;
+      --bg-bottom: #050913;
+      --panel: rgba(11, 20, 33, 0.88);
+      --panel-border: rgba(124, 186, 255, 0.24);
+      --board: #08111d;
+      --board-grid: rgba(147, 197, 253, 0.09);
+      --text: #e2edf8;
+      --muted: #8ca3bb;
+      --accent: #f8b84e;
+      --danger: #f97373;
+      --ok: #7dd3fc;
+      --shadow: rgba(0, 0, 0, 0.4);
     }
 
     * {
@@ -30,490 +29,793 @@
       min-height: 100vh;
       display: grid;
       place-items: center;
-      background: radial-gradient(circle at 20% 0%, #1c2f42 0%, var(--bg) 55%);
+      padding: 20px;
+      background:
+        radial-gradient(circle at top, rgba(56, 189, 248, 0.18), transparent 32%),
+        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
       color: var(--text);
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
     }
 
-    .game-wrap {
-      width: min(92vw, 540px);
-      background: color-mix(in srgb, var(--panel) 90%, #000);
-      border: 1px solid #2a465c;
-      border-radius: 14px;
-      padding: 14px;
-      box-shadow: 0 18px 35px rgba(0, 0, 0, 0.35);
+    .shell {
+      width: min(96vw, 940px);
+      display: grid;
+      grid-template-columns: minmax(280px, 440px) minmax(220px, 1fr);
+      gap: 18px;
+      align-items: start;
     }
 
-    .hud {
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 20px;
+      box-shadow: 0 24px 44px var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .board-panel {
+      padding: 18px;
+    }
+
+    .topbar {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-      gap: 10px;
+      align-items: end;
+      gap: 12px;
+      margin-bottom: 14px;
       flex-wrap: wrap;
     }
 
     .title {
-      font-size: 1.1rem;
-      letter-spacing: 0.06em;
       margin: 0;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      letter-spacing: 0.12em;
+      line-height: 0.9;
     }
 
-    .status {
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
       font-size: 0.92rem;
-      color: var(--muted);
+      letter-spacing: 0.04em;
     }
 
-    .score {
-      font-weight: 700;
-      color: var(--snake);
-    }
-
-    .hint {
-      margin: 10px 0 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-      text-align: center;
+    .badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(248, 184, 78, 0.35);
+      color: #ffe7bf;
+      background: rgba(248, 184, 78, 0.12);
+      font-size: 0.88rem;
+      white-space: nowrap;
     }
 
     canvas {
-      display: block;
       width: 100%;
-      aspect-ratio: 1;
-      background:
-        linear-gradient(90deg, transparent 24px, var(--grid) 24px, var(--grid) 25px, transparent 25px),
-        linear-gradient(transparent 24px, var(--grid) 24px, var(--grid) 25px, transparent 25px),
-        #0f1d29;
-      background-size: 25px 25px;
-      border-radius: 10px;
-      border: 1px solid #35566f;
+      max-width: 404px;
+      aspect-ratio: 1 / 2;
+      display: block;
+      margin: 0 auto;
+      border-radius: 14px;
+      border: 1px solid rgba(147, 197, 253, 0.2);
+      background: linear-gradient(180deg, rgba(9, 16, 28, 0.96), rgba(5, 10, 18, 0.98));
     }
 
     .overlay {
-      margin-top: 10px;
+      min-height: 1.6rem;
+      margin-top: 12px;
       text-align: center;
-      min-height: 1.4rem;
       font-weight: 700;
-      color: var(--food);
+      color: var(--accent);
+      letter-spacing: 0.03em;
     }
 
-    @media (max-width: 520px) {
-      .hint {
-        font-size: 0.82rem;
+    .side-panel {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(17, 29, 47, 0.9);
+      border: 1px solid rgba(147, 197, 253, 0.14);
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .value {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    .preview-wrap {
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+    }
+
+    .preview {
+      width: min(100%, 190px);
+      aspect-ratio: 1;
+      border-radius: 16px;
+      border: 1px solid rgba(147, 197, 253, 0.14);
+      background: radial-gradient(circle at top, rgba(125, 211, 252, 0.06), transparent 60%), #09111b;
+      display: grid;
+      place-items: center;
+    }
+
+    .blocker {
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(249, 115, 115, 0.18);
+      background: rgba(63, 20, 28, 0.32);
+    }
+
+    .blocker-state {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffd4d4;
+    }
+
+    .blocker-timer {
+      margin-top: 6px;
+      color: #f9b0b0;
+      font-size: 0.92rem;
+    }
+
+    .controls {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+    }
+
+    .controls strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 860px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .blocker,
+      .controls,
+      .preview-wrap {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 560px) {
+      body {
+        padding: 12px;
+      }
+
+      .board-panel,
+      .side-panel {
+        padding: 14px;
+      }
+
+      .stat-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
 <body>
-  <main class="game-wrap">
-    <div class="hud">
-      <h1 class="title">SNAKE</h1>
-      <div id="status" class="status">Dodge rocks, cars, and thunder</div>
-      <div class="score">Score: <span id="score">0</span></div>
-    </div>
-    <canvas id="board" width="500" height="500" aria-label="Snake game board"></canvas>
-    <div id="overlay" class="overlay"></div>
-    <p class="hint">Use Arrow Keys or WASD. Rocks block you, cars roam lanes, thunder flashes before it strikes. Press Space to restart after game over.</p>
+  <main class="shell">
+    <section class="panel board-panel">
+      <div class="topbar">
+        <div>
+          <h1 class="title">TETRIS</h1>
+          <p class="subtitle">Stack clean lines before the controls jam.</p>
+        </div>
+        <div id="statusBadge" class="badge">Arrow blocker idle</div>
+      </div>
+      <canvas id="board" width="400" height="800" aria-label="Tetris board"></canvas>
+      <div id="overlay" class="overlay"></div>
+    </section>
+
+    <aside class="panel side-panel">
+      <div class="stat-grid">
+        <div class="card">
+          <span class="label">Score</span>
+          <span id="score" class="value">0</span>
+        </div>
+        <div class="card">
+          <span class="label">Lines</span>
+          <span id="lines" class="value">0</span>
+        </div>
+        <div class="card">
+          <span class="label">Level</span>
+          <span id="level" class="value">1</span>
+        </div>
+        <div class="card">
+          <span class="label">Drop Pace</span>
+          <span id="speed" class="value">1.00x</span>
+        </div>
+      </div>
+
+      <div class="card preview-wrap">
+        <span class="label">Next Piece</span>
+        <canvas id="preview" class="preview" width="180" height="180" aria-label="Next piece preview"></canvas>
+      </div>
+
+      <div class="blocker">
+        <span class="label">Horizontal Arrow Blocker</span>
+        <div id="blockerState" class="blocker-state">No jam active</div>
+        <div id="blockerTimer" class="blocker-timer">Next jam in 12.0s</div>
+      </div>
+
+      <div class="card controls">
+        <div><strong>Move</strong>: Left / Right or A / D</div>
+        <div><strong>Rotate</strong>: Up / W / X</div>
+        <div><strong>Soft Drop</strong>: Down / S</div>
+        <div><strong>Hard Drop</strong>: Space</div>
+        <div><strong>Pause</strong>: P</div>
+        <div>When the blocker fires, left, right, or both horizontal arrows are disabled for a few seconds.</div>
+      </div>
+    </aside>
   </main>
 
   <script>
-    const canvas = document.getElementById("board");
-    const ctx = canvas.getContext("2d");
+    const boardCanvas = document.getElementById("board");
+    const boardCtx = boardCanvas.getContext("2d");
+    const previewCanvas = document.getElementById("preview");
+    const previewCtx = previewCanvas.getContext("2d");
     const scoreEl = document.getElementById("score");
-    const statusEl = document.getElementById("status");
+    const linesEl = document.getElementById("lines");
+    const levelEl = document.getElementById("level");
+    const speedEl = document.getElementById("speed");
     const overlayEl = document.getElementById("overlay");
+    const blockerStateEl = document.getElementById("blockerState");
+    const blockerTimerEl = document.getElementById("blockerTimer");
+    const statusBadgeEl = document.getElementById("statusBadge");
 
-    const gridCount = 20;
-    const tileSize = canvas.width / gridCount;
-    const tickMs = 110;
-    const rockCount = 16;
-    const carLanes = [4, 9, 14];
-    const thunderWarningTicks = 2;
-    const thunderActiveTicks = 1;
-    const thunderCooldownMin = 5;
-    const thunderCooldownRange = 4;
+    const COLS = 10;
+    const ROWS = 20;
+    const BLOCK = boardCanvas.width / COLS;
+    const PREVIEW_BLOCK = 30;
+    const BASE_DROP_MS = 760;
+    const BLOCKER_IDLE_MS = [10000, 16000];
+    const BLOCKER_ACTIVE_MS = [4500, 7500];
 
-    let snake;
-    let direction;
-    let nextDirection;
-    let food;
-    let rocks;
-    let cars;
-    let thunder;
+    const COLORS = {
+      I: "#38bdf8",
+      J: "#60a5fa",
+      L: "#fb923c",
+      O: "#facc15",
+      S: "#4ade80",
+      T: "#c084fc",
+      Z: "#f87171"
+    };
+
+    const SHAPES = {
+      I: [[1, 1, 1, 1]],
+      J: [[1, 0, 0], [1, 1, 1]],
+      L: [[0, 0, 1], [1, 1, 1]],
+      O: [[1, 1], [1, 1]],
+      S: [[0, 1, 1], [1, 1, 0]],
+      T: [[0, 1, 0], [1, 1, 1]],
+      Z: [[1, 1, 0], [0, 1, 1]]
+    };
+
+    const BAG = Object.keys(SHAPES);
+    const scoreByLines = [0, 100, 300, 500, 800];
+
+    let board;
+    let bag;
+    let currentPiece;
+    let nextPiece;
     let score;
-    let running;
-    let endReason;
-    let timerId;
+    let lines;
+    let level;
+    let dropAccumulator;
+    let lastTime = 0;
+    let paused;
+    let gameOver;
+    let blocker;
+    let blockerFlash = 0;
 
-    function resetGame() {
-      snake = [
-        { x: 9, y: 10 },
-        { x: 8, y: 10 },
-        { x: 7, y: 10 },
-      ];
-      direction = { x: 1, y: 0 };
-      nextDirection = { x: 1, y: 0 };
-      rocks = buildRocks();
-      cars = buildCars();
-      thunder = {
-        warningTiles: [],
-        activeTiles: [],
-        timer: nextThunderDelay(),
-      };
-      food = spawnFood();
-      score = 0;
-      running = true;
-      endReason = "";
-      scoreEl.textContent = "0";
-      statusEl.textContent = "Dodge rocks, cars, and thunder";
-      overlayEl.textContent = "";
-      draw();
+    function createMatrix(rows, cols) {
+      return Array.from({ length: rows }, () => Array(cols).fill(""));
     }
 
-    function randomCell() {
-      return {
-        x: Math.floor(Math.random() * gridCount),
-        y: Math.floor(Math.random() * gridCount),
-      };
+    function randomRange(min, max) {
+      return min + Math.random() * (max - min);
     }
 
-    function samePoint(a, b) {
-      return a.x === b.x && a.y === b.y;
-    }
-
-    function pointInList(point, list) {
-      return list.some((item) => samePoint(item, point));
-    }
-
-    function buildRocks() {
-      const newRocks = [];
-      const reserved = [...snake];
-
-      while (newRocks.length < rockCount) {
-        const candidate = randomCell();
-        const blockedLane = carLanes.includes(candidate.y);
-        const tooCloseToStart = candidate.y >= 8 && candidate.y <= 12 && candidate.x >= 6 && candidate.x <= 12;
-        if (blockedLane || tooCloseToStart || pointInList(candidate, reserved) || pointInList(candidate, newRocks)) {
-          continue;
-        }
-        newRocks.push(candidate);
+    function shuffle(values) {
+      const clone = [...values];
+      for (let index = clone.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [clone[index], clone[swapIndex]] = [clone[swapIndex], clone[index]];
       }
-
-      return newRocks;
+      return clone;
     }
 
-    function buildCars() {
-      return carLanes.flatMap((lane, laneIndex) => {
-        const fromLeft = laneIndex % 2 === 0;
-        return Array.from({ length: 2 }, (_, index) => ({
-          x: fromLeft ? (laneIndex * 7 + index * 9) % gridCount : (gridCount - 1 - laneIndex * 6 - index * 8 + gridCount * 4) % gridCount,
-          y: lane,
-          dx: fromLeft ? 1 : -1,
-          color: laneIndex % 2 === 0 ? "#38bdf8" : "#fb7185",
-        }));
-      });
-    }
-
-    function nextThunderDelay() {
-      return thunderCooldownMin + Math.floor(Math.random() * thunderCooldownRange);
-    }
-
-    function currentHazardTiles() {
-      return [
-        ...rocks,
-        ...cars.map((car) => ({ x: car.x, y: car.y })),
-        ...thunder.warningTiles,
-        ...thunder.activeTiles,
-      ];
-    }
-
-    function spawnFood() {
-      while (true) {
-        const candidate = randomCell();
-        const occupied = snake.some((segment) => samePoint(segment, candidate)) || pointInList(candidate, currentHazardTiles());
-        if (!occupied) return candidate;
+    function refillBag() {
+      if (bag.length === 0) {
+        bag = shuffle(BAG);
       }
     }
 
-    function sameDirection(a, b) {
-      return a.x === b.x && a.y === b.y;
-    }
-
-    function setDirection(x, y) {
-      const proposed = { x, y };
-      const reverse = proposed.x === -direction.x && proposed.y === -direction.y;
-      if (!reverse && !sameDirection(proposed, nextDirection)) {
-        nextDirection = proposed;
-      }
-    }
-
-    function endGame(reason) {
-      running = false;
-      endReason = reason;
-      statusEl.textContent = reason;
-      overlayEl.textContent = `${reason} - press Space to restart`;
-    }
-
-    function advanceCars() {
-      cars = cars.map((car) => ({
-        ...car,
-        x: (car.x + car.dx + gridCount) % gridCount,
-      }));
-    }
-
-    function chooseThunderTiles(count) {
-      const tiles = [];
-      const blocked = [...snake, food, ...rocks, ...cars.map((car) => ({ x: car.x, y: car.y }))];
-
-      while (tiles.length < count) {
-        const candidate = randomCell();
-        const crowdedCenter = candidate.x >= 7 && candidate.x <= 12 && candidate.y >= 7 && candidate.y <= 12;
-        if (crowdedCenter || pointInList(candidate, blocked) || pointInList(candidate, tiles)) {
-          continue;
-        }
-        tiles.push(candidate);
-      }
-
-      return tiles;
-    }
-
-    function advanceThunder() {
-      if (thunder.warningTiles.length > 0) {
-        thunder = {
-          ...thunder,
-          warningTicksLeft: thunder.warningTicksLeft - 1,
-        };
-
-        if (thunder.warningTicksLeft <= 0) {
-          thunder = {
-            warningTiles: [],
-            activeTiles: thunder.warningTiles,
-            activeTicksLeft: thunderActiveTicks,
-            timer: nextThunderDelay(),
-          };
-        }
-
-        return;
-      }
-
-      if (thunder.activeTiles.length > 0) {
-        thunder = {
-          ...thunder,
-          activeTicksLeft: thunder.activeTicksLeft - 1,
-        };
-
-        if (thunder.activeTicksLeft <= 0) {
-          thunder = {
-            warningTiles: [],
-            activeTiles: [],
-            timer: thunder.timer,
-          };
-        }
-
-        return;
-      }
-
-      thunder = {
-        ...thunder,
-        timer: thunder.timer - 1,
-      };
-
-      if (thunder.timer <= 0) {
-        thunder = {
-          warningTiles: chooseThunderTiles(3),
-          activeTiles: [],
-          warningTicksLeft: thunderWarningTicks,
-          timer: 0,
-        };
-      }
-    }
-
-    function hazardReasonFor(point) {
-      if (pointInList(point, rocks)) return "A rock blocked the way";
-      if (cars.some((car) => samePoint(car, point))) return "A car flattened the snake";
-      if (pointInList(point, thunder.activeTiles)) return "Thunder struck the snake";
-      return "";
-    }
-
-    function snakeHitHazard(segments) {
-      return segments.find((segment) => hazardReasonFor(segment));
-    }
-
-    function updateFoodSafety() {
-      if (pointInList(food, currentHazardTiles())) {
-        food = spawnFood();
-      }
-    }
-
-    function step() {
-      if (!running) return;
-
-      direction = nextDirection;
-      advanceCars();
-      advanceThunder();
-      updateFoodSafety();
-
-      const struckSegment = snakeHitHazard(snake);
-      if (struckSegment) {
-        endGame(hazardReasonFor(struckSegment));
-        draw();
-        return;
-      }
-
-      const head = snake[0];
-      const newHead = { x: head.x + direction.x, y: head.y + direction.y };
-      const ateFood = newHead.x === food.x && newHead.y === food.y;
-
-      const hitWall =
-        newHead.x < 0 || newHead.x >= gridCount || newHead.y < 0 || newHead.y >= gridCount;
-      const bodyToCheck = ateFood ? snake : snake.slice(0, -1);
-      const hitSelf = bodyToCheck.some((segment) => segment.x === newHead.x && segment.y === newHead.y);
-      const hitHazard = hazardReasonFor(newHead);
-
-      if (hitWall) {
-        endGame("The snake hit the wall");
-        draw();
-        return;
-      }
-
-      if (hitSelf) {
-        endGame("The snake tied itself in a knot");
-        draw();
-        return;
-      }
-
-      if (hitHazard) {
-        endGame(hitHazard);
-        draw();
-        return;
-      }
-
-      snake.unshift(newHead);
-
-      if (ateFood) {
-        score += 1;
-        scoreEl.textContent = String(score);
-        food = spawnFood();
-        statusEl.textContent = score < 5 ? "Warm up lap" : score < 10 ? "Traffic is getting rough" : "Storm survival mode";
-      } else {
-        snake.pop();
-      }
-
-      draw();
-    }
-
-    function drawTile(x, y, color) {
-      const padding = 2;
+    function drawRoundedTile(ctx, x, y, size, color) {
+      const radius = size * 0.18;
       ctx.fillStyle = color;
-      ctx.fillRect(x * tileSize + padding, y * tileSize + padding, tileSize - padding * 2, tileSize - padding * 2);
-    }
-
-    function drawRock(rock) {
-      const baseX = rock.x * tileSize;
-      const baseY = rock.y * tileSize;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--rock");
       ctx.beginPath();
-      ctx.moveTo(baseX + tileSize * 0.2, baseY + tileSize * 0.82);
-      ctx.lineTo(baseX + tileSize * 0.35, baseY + tileSize * 0.24);
-      ctx.lineTo(baseX + tileSize * 0.56, baseY + tileSize * 0.16);
-      ctx.lineTo(baseX + tileSize * 0.8, baseY + tileSize * 0.35);
-      ctx.lineTo(baseX + tileSize * 0.74, baseY + tileSize * 0.8);
-      ctx.closePath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + size - radius, y);
+      ctx.quadraticCurveTo(x + size, y, x + size, y + radius);
+      ctx.lineTo(x + size, y + size - radius);
+      ctx.quadraticCurveTo(x + size, y + size, x + size - radius, y + size);
+      ctx.lineTo(x + radius, y + size);
+      ctx.quadraticCurveTo(x, y + size, x, y + size - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
       ctx.fill();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.fillRect(x + size * 0.1, y + size * 0.1, size * 0.8, size * 0.18);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     }
 
-    function drawCar(car) {
-      const baseX = car.x * tileSize;
-      const baseY = car.y * tileSize;
-      ctx.fillStyle = car.color;
-      ctx.fillRect(baseX + tileSize * 0.08, baseY + tileSize * 0.24, tileSize * 0.84, tileSize * 0.5);
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--car-dark");
-      ctx.fillRect(baseX + tileSize * 0.23, baseY + tileSize * 0.3, tileSize * 0.18, tileSize * 0.18);
-      ctx.fillRect(baseX + tileSize * 0.59, baseY + tileSize * 0.3, tileSize * 0.18, tileSize * 0.18);
-      ctx.beginPath();
-      ctx.arc(baseX + tileSize * 0.28, baseY + tileSize * 0.76, tileSize * 0.09, 0, Math.PI * 2);
-      ctx.arc(baseX + tileSize * 0.72, baseY + tileSize * 0.76, tileSize * 0.09, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function drawThunderTile(tile, color, glow) {
-      const centerX = tile.x * tileSize + tileSize / 2;
-      const centerY = tile.y * tileSize + tileSize / 2;
+    function drawGrid(ctx, width, height, size) {
       ctx.save();
-      ctx.shadowBlur = glow;
-      ctx.shadowColor = color;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(centerX - 3, centerY - 9);
-      ctx.lineTo(centerX + 4, centerY - 9);
-      ctx.lineTo(centerX - 1, centerY);
-      ctx.lineTo(centerX + 6, centerY);
-      ctx.lineTo(centerX - 5, centerY + 10);
-      ctx.lineTo(centerX - 1, centerY + 2);
-      ctx.lineTo(centerX - 8, centerY + 2);
-      ctx.closePath();
-      ctx.fill();
+      ctx.strokeStyle = "rgba(147, 197, 253, 0.08)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= width; x += size) {
+        ctx.beginPath();
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= height; y += size) {
+        ctx.beginPath();
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(width, y + 0.5);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function rotateMatrix(matrix) {
+      return matrix[0].map((_, index) => matrix.map((row) => row[index]).reverse());
+    }
 
-      rocks.forEach(drawRock);
-      thunder.warningTiles.forEach((tile) => {
-        drawTile(tile.x, tile.y, "rgba(245, 158, 11, 0.18)");
-        drawThunderTile(tile, getComputedStyle(document.documentElement).getPropertyValue("--thunder-warn"), 8);
-      });
-      thunder.activeTiles.forEach((tile) => {
-        drawTile(tile.x, tile.y, "rgba(168, 85, 247, 0.26)");
-        drawThunderTile(tile, getComputedStyle(document.documentElement).getPropertyValue("--thunder-hit"), 16);
-      });
-      cars.forEach(drawCar);
-      drawTile(food.x, food.y, getComputedStyle(document.documentElement).getPropertyValue("--food"));
+    function createPiece(type) {
+      const matrix = SHAPES[type].map((row) => [...row]);
+      return {
+        type,
+        matrix,
+        x: Math.floor((COLS - matrix[0].length) / 2),
+        y: -1
+      };
+    }
 
-      snake.forEach((segment, index) => {
-        const color = index === 0
-          ? getComputedStyle(document.documentElement).getPropertyValue("--head")
-          : getComputedStyle(document.documentElement).getPropertyValue("--snake");
-        drawTile(segment.x, segment.y, color);
+    function pullPiece() {
+      refillBag();
+      return createPiece(bag.pop());
+    }
+
+    function resetBlocker() {
+      blocker = {
+        mode: "idle",
+        blocked: null,
+        timer: randomRange(...BLOCKER_IDLE_MS)
+      };
+    }
+
+    function resetGame() {
+      board = createMatrix(ROWS, COLS);
+      bag = [];
+      score = 0;
+      lines = 0;
+      level = 1;
+      dropAccumulator = 0;
+      paused = false;
+      gameOver = false;
+      blockerFlash = 0;
+      resetBlocker();
+      currentPiece = pullPiece();
+      nextPiece = pullPiece();
+      updateStats();
+      overlayEl.textContent = "";
+      statusBadgeEl.textContent = "Arrow blocker idle";
+      draw();
+    }
+
+    function getDropDelay() {
+      return Math.max(120, BASE_DROP_MS - (level - 1) * 55);
+    }
+
+    function updateStats() {
+      scoreEl.textContent = String(score);
+      linesEl.textContent = String(lines);
+      levelEl.textContent = String(level);
+      speedEl.textContent = `${(BASE_DROP_MS / getDropDelay()).toFixed(2)}x`;
+    }
+
+    function collides(piece, moveX = 0, moveY = 0, matrix = piece.matrix) {
+      for (let y = 0; y < matrix.length; y += 1) {
+        for (let x = 0; x < matrix[y].length; x += 1) {
+          if (!matrix[y][x]) {
+            continue;
+          }
+          const nextX = piece.x + x + moveX;
+          const nextY = piece.y + y + moveY;
+          if (nextX < 0 || nextX >= COLS || nextY >= ROWS) {
+            return true;
+          }
+          if (nextY >= 0 && board[nextY][nextX]) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function mergePiece() {
+      currentPiece.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (!value) {
+            return;
+          }
+          const boardY = currentPiece.y + y;
+          if (boardY < 0) {
+            gameOver = true;
+            return;
+          }
+          board[boardY][currentPiece.x + x] = currentPiece.type;
+        });
       });
     }
 
-    function startLoop() {
-      clearInterval(timerId);
-      timerId = setInterval(step, tickMs);
+    function clearLines() {
+      let cleared = 0;
+      for (let row = ROWS - 1; row >= 0; row -= 1) {
+        if (board[row].every(Boolean)) {
+          board.splice(row, 1);
+          board.unshift(Array(COLS).fill(""));
+          cleared += 1;
+          row += 1;
+        }
+      }
+
+      if (cleared > 0) {
+        lines += cleared;
+        score += scoreByLines[cleared] * level;
+        level = Math.floor(lines / 10) + 1;
+        updateStats();
+      }
+    }
+
+    function spawnNextPiece() {
+      currentPiece = nextPiece;
+      currentPiece.x = Math.floor((COLS - currentPiece.matrix[0].length) / 2);
+      currentPiece.y = -1;
+      nextPiece = pullPiece();
+      if (collides(currentPiece)) {
+        gameOver = true;
+      }
+    }
+
+    function lockPiece() {
+      mergePiece();
+      if (gameOver) {
+        overlayEl.textContent = "Stack reached the ceiling. Press Space to restart.";
+        return;
+      }
+      clearLines();
+      spawnNextPiece();
+    }
+
+    function attemptMove(deltaX) {
+      if (blocker.mode === "active" && (blocker.blocked === "both" || blocker.blocked === (deltaX < 0 ? "left" : "right"))) {
+        blockerFlash = 180;
+        return false;
+      }
+      if (!collides(currentPiece, deltaX, 0)) {
+        currentPiece.x += deltaX;
+        return true;
+      }
+      return false;
+    }
+
+    function attemptRotate() {
+      const rotated = rotateMatrix(currentPiece.matrix);
+      const kickTests = [0, -1, 1, -2, 2];
+      for (const offset of kickTests) {
+        if (!collides(currentPiece, offset, 0, rotated)) {
+          currentPiece.matrix = rotated;
+          currentPiece.x += offset;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function stepDown() {
+      if (!collides(currentPiece, 0, 1)) {
+        currentPiece.y += 1;
+        return true;
+      }
+      lockPiece();
+      return false;
+    }
+
+    function hardDrop() {
+      let distance = 0;
+      while (!collides(currentPiece, 0, 1)) {
+        currentPiece.y += 1;
+        distance += 1;
+      }
+      score += distance * 2;
+      updateStats();
+      lockPiece();
+    }
+
+    function updateBlocker(deltaMs) {
+      blocker.timer -= deltaMs;
+      if (blocker.mode === "idle" && blocker.timer <= 0) {
+        const modes = ["left", "right", "both"];
+        blocker.mode = "active";
+        blocker.blocked = modes[Math.floor(Math.random() * modes.length)];
+        blocker.timer = randomRange(...BLOCKER_ACTIVE_MS);
+      } else if (blocker.mode === "active" && blocker.timer <= 0) {
+        resetBlocker();
+      }
+
+      if (blockerFlash > 0) {
+        blockerFlash = Math.max(0, blockerFlash - deltaMs);
+      }
+    }
+
+    function blockerLabel() {
+      if (blocker.mode === "idle") {
+        return "No jam active";
+      }
+      if (blocker.blocked === "both") {
+        return "Left and right blocked";
+      }
+      return `${blocker.blocked[0].toUpperCase()}${blocker.blocked.slice(1)} blocked`;
+    }
+
+    function updateBlockerUi() {
+      blockerStateEl.textContent = blockerLabel();
+      if (blocker.mode === "idle") {
+        blockerTimerEl.textContent = `Next jam in ${(blocker.timer / 1000).toFixed(1)}s`;
+        statusBadgeEl.textContent = "Arrow blocker idle";
+      } else {
+        blockerTimerEl.textContent = `Jam clears in ${(blocker.timer / 1000).toFixed(1)}s`;
+        statusBadgeEl.textContent = blockerLabel();
+      }
+    }
+
+    function getGhostY() {
+      let offset = 0;
+      while (!collides(currentPiece, 0, offset + 1)) {
+        offset += 1;
+      }
+      return currentPiece.y + offset;
+    }
+
+    function drawBoard() {
+      boardCtx.clearRect(0, 0, boardCanvas.width, boardCanvas.height);
+
+      const boardGradient = boardCtx.createLinearGradient(0, 0, 0, boardCanvas.height);
+      boardGradient.addColorStop(0, "rgba(10, 18, 31, 0.95)");
+      boardGradient.addColorStop(1, "rgba(4, 8, 15, 0.98)");
+      boardCtx.fillStyle = boardGradient;
+      boardCtx.fillRect(0, 0, boardCanvas.width, boardCanvas.height);
+      drawGrid(boardCtx, boardCanvas.width, boardCanvas.height, BLOCK);
+
+      board.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          if (cell) {
+            drawRoundedTile(boardCtx, x * BLOCK + 2, y * BLOCK + 2, BLOCK - 4, COLORS[cell]);
+          }
+        });
+      });
+
+      const ghostY = getGhostY();
+      currentPiece.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (!value) {
+            return;
+          }
+          const drawX = (currentPiece.x + x) * BLOCK + 2;
+          const drawY = (ghostY + y) * BLOCK + 2;
+          if (ghostY + y >= 0) {
+            boardCtx.save();
+            boardCtx.globalAlpha = 0.18;
+            drawRoundedTile(boardCtx, drawX, drawY, BLOCK - 4, COLORS[currentPiece.type]);
+            boardCtx.restore();
+          }
+        });
+      });
+
+      currentPiece.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (!value) {
+            return;
+          }
+          const pieceY = currentPiece.y + y;
+          if (pieceY < 0) {
+            return;
+          }
+          const drawX = (currentPiece.x + x) * BLOCK + 2;
+          const drawY = pieceY * BLOCK + 2;
+          drawRoundedTile(boardCtx, drawX, drawY, BLOCK - 4, COLORS[currentPiece.type]);
+        });
+      });
+
+      if (blocker.mode === "active") {
+        boardCtx.save();
+        boardCtx.fillStyle = "rgba(249, 115, 115, 0.12)";
+        if (blocker.blocked === "left" || blocker.blocked === "both") {
+          boardCtx.fillRect(0, 0, BLOCK, boardCanvas.height);
+        }
+        if (blocker.blocked === "right" || blocker.blocked === "both") {
+          boardCtx.fillRect(boardCanvas.width - BLOCK, 0, BLOCK, boardCanvas.height);
+        }
+        boardCtx.restore();
+      }
+
+      if (blockerFlash > 0) {
+        boardCtx.save();
+        boardCtx.fillStyle = `rgba(249, 115, 115, ${0.08 + blockerFlash / 800})`;
+        boardCtx.fillRect(0, 0, boardCanvas.width, boardCanvas.height);
+        boardCtx.restore();
+      }
+    }
+
+    function drawPreview() {
+      previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      previewCtx.fillStyle = "#09111b";
+      previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+
+      const matrix = nextPiece.matrix;
+      const width = matrix[0].length * PREVIEW_BLOCK;
+      const height = matrix.length * PREVIEW_BLOCK;
+      const startX = (previewCanvas.width - width) / 2;
+      const startY = (previewCanvas.height - height) / 2;
+
+      matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value) {
+            drawRoundedTile(
+              previewCtx,
+              startX + x * PREVIEW_BLOCK + 2,
+              startY + y * PREVIEW_BLOCK + 2,
+              PREVIEW_BLOCK - 4,
+              COLORS[nextPiece.type]
+            );
+          }
+        });
+      });
+    }
+
+    function draw() {
+      drawBoard();
+      drawPreview();
+      updateBlockerUi();
+    }
+
+    function tick(timestamp) {
+      if (!lastTime) {
+        lastTime = timestamp;
+      }
+      const delta = timestamp - lastTime;
+      lastTime = timestamp;
+
+      if (!paused && !gameOver) {
+        dropAccumulator += delta;
+        updateBlocker(delta);
+        if (dropAccumulator >= getDropDelay()) {
+          dropAccumulator = 0;
+          stepDown();
+        }
+      }
+
+      if (paused && !gameOver) {
+        overlayEl.textContent = "Paused";
+      } else if (!gameOver) {
+        overlayEl.textContent = "";
+      }
+
+      draw();
+
+      if (gameOver) {
+        overlayEl.textContent = "Stack reached the ceiling. Press Space to restart.";
+      }
+
+      requestAnimationFrame(tick);
+    }
+
+    function restart() {
+      resetGame();
+      lastTime = 0;
     }
 
     document.addEventListener("keydown", (event) => {
-      switch (event.key) {
-        case "ArrowUp":
-        case "w":
-        case "W":
-          setDirection(0, -1);
-          break;
-        case "ArrowDown":
-        case "s":
-        case "S":
-          setDirection(0, 1);
-          break;
-        case "ArrowLeft":
+      const key = event.key;
+      const lower = key.toLowerCase();
+      const isMovementKey = ["arrowleft", "arrowright", "arrowdown", "arrowup", " ", "a", "d", "s", "w", "x", "p"].includes(lower);
+      if (isMovementKey) {
+        event.preventDefault();
+      }
+
+      if (key === " " && gameOver) {
+        restart();
+        return;
+      }
+
+      if (lower === "p" && !gameOver) {
+        paused = !paused;
+        return;
+      }
+
+      if (paused || gameOver) {
+        return;
+      }
+
+      switch (lower) {
+        case "arrowleft":
         case "a":
-        case "A":
-          setDirection(-1, 0);
+          attemptMove(-1);
           break;
-        case "ArrowRight":
+        case "arrowright":
         case "d":
-        case "D":
-          setDirection(1, 0);
+          attemptMove(1);
+          break;
+        case "arrowdown":
+        case "s":
+          if (stepDown()) {
+            score += 1;
+            updateStats();
+          }
+          dropAccumulator = 0;
+          break;
+        case "arrowup":
+        case "w":
+        case "x":
+          attemptRotate();
           break;
         case " ":
-          if (!running) resetGame();
+          hardDrop();
+          dropAccumulator = 0;
           break;
       }
+      draw();
     });
 
     resetGame();
-    startLoop();
+    requestAnimationFrame(tick);
   </script>
 </body>
 </html>
