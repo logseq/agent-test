@@ -12,6 +12,10 @@
       --snake: #facc15;
       --head: #fde047;
       --food: #ff6b6b;
+      --rock: #94a3b8;
+      --car: #38bdf8;
+      --thunder-warning: #c084fc;
+      --thunder-active: #f8fafc;
       --text: #f1f5f9;
       --muted: #9fb0bd;
     }
@@ -86,6 +90,13 @@
       color: var(--food);
     }
 
+    .legend {
+      margin: 8px 0 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
     @media (max-width: 520px) {
       .hint {
         font-size: 0.82rem;
@@ -101,7 +112,8 @@
     </div>
     <canvas id="board" width="500" height="500" aria-label="Snake game board"></canvas>
     <div id="overlay" class="overlay"></div>
-    <p class="hint">Use Arrow Keys or WASD. Press Space to restart after game over.</p>
+    <p class="hint">Use Arrow Keys or WASD. Eat food and avoid rocks, cars, and thunder. Press Space to restart after game over.</p>
+    <p class="legend">Rocks stay put. Cars sweep across lanes. Thunder flashes where the warning markers appear.</p>
   </main>
 
   <script>
@@ -113,14 +125,114 @@
     const gridCount = 20;
     const tileSize = canvas.width / gridCount;
     const tickMs = 110;
+    const rockCount = 12;
+    const thunderWarningTicks = 5;
+    const thunderActiveTicks = 2;
+    const thunderCooldownMin = 7;
+    const thunderCooldownMax = 13;
+    const carConfigs = [
+      { y: 4, direction: 1, moveEvery: 2, length: 2, offset: 1 },
+      { y: 9, direction: -1, moveEvery: 3, length: 3, offset: 7 },
+      { y: 14, direction: 1, moveEvery: 2, length: 2, offset: 12 },
+    ];
 
     let snake;
     let direction;
     let nextDirection;
     let food;
+    let rocks;
+    let cars;
+    let thunder;
     let score;
     let running;
     let timerId;
+    let tickCount;
+
+    function samePoint(a, b) {
+      return a.x === b.x && a.y === b.y;
+    }
+
+    function inStartingZone(point) {
+      return point.x >= 5 && point.x <= 11 && point.y >= 8 && point.y <= 12;
+    }
+
+    function randomGridPoint() {
+      return {
+        x: Math.floor(Math.random() * gridCount),
+        y: Math.floor(Math.random() * gridCount),
+      };
+    }
+
+    function randomRange(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function makeThunderState(strike) {
+      return {
+        strike,
+        phase: "warning",
+        ticksRemaining: thunderWarningTicks,
+        cooldown: 0,
+      };
+    }
+
+    function scheduleNextThunder() {
+      thunder = {
+        strike: null,
+        phase: "cooldown",
+        ticksRemaining: 0,
+        cooldown: randomRange(thunderCooldownMin, thunderCooldownMax),
+      };
+    }
+
+    function createCars() {
+      return carConfigs.map((config) => ({
+        ...config,
+        progress: config.offset,
+      }));
+    }
+
+    function getCarTiles(car) {
+      const front = ((car.progress % gridCount) + gridCount) % gridCount;
+      return Array.from({ length: car.length }, (_, index) => {
+        const x = ((front - index * car.direction) % gridCount + gridCount) % gridCount;
+        return { x, y: car.y };
+      });
+    }
+
+    function isCarOnTile(candidate) {
+      return cars?.some((car) => getCarTiles(car).some((tile) => samePoint(tile, candidate)));
+    }
+
+    function isThunderHazard(candidate) {
+      return thunder?.strike && samePoint(thunder.strike, candidate);
+    }
+
+    function isBlockedTile(candidate, options = {}) {
+      const {
+        ignoreFood = false,
+        ignoreThunder = false,
+      } = options;
+      const onSnake = snake?.some((segment) => samePoint(segment, candidate));
+      const onRock = rocks?.some((rock) => samePoint(rock, candidate));
+      const onCar = isCarOnTile(candidate);
+      const onFood = !ignoreFood && food && samePoint(food, candidate);
+      const onThunder = !ignoreThunder && isThunderHazard(candidate);
+      return onSnake || onRock || onCar || onFood || onThunder;
+    }
+
+    function spawnRocks() {
+      const nextRocks = [];
+      while (nextRocks.length < rockCount) {
+        const candidate = randomGridPoint();
+        const duplicate = nextRocks.some((rock) => samePoint(rock, candidate));
+        const inCarLane = cars.some((car) => car.y === candidate.y);
+        if (!duplicate && !inStartingZone(candidate) && !inCarLane) {
+          nextRocks.push(candidate);
+        }
+      }
+      return nextRocks;
+    }
 
     function resetGame() {
       snake = [
@@ -130,9 +242,13 @@
       ];
       direction = { x: 1, y: 0 };
       nextDirection = { x: 1, y: 0 };
+      cars = createCars();
+      rocks = spawnRocks();
+      scheduleNextThunder();
       food = spawnFood();
       score = 0;
       running = true;
+      tickCount = 0;
       scoreEl.textContent = "0";
       overlayEl.textContent = "";
       draw();
@@ -140,12 +256,8 @@
 
     function spawnFood() {
       while (true) {
-        const candidate = {
-          x: Math.floor(Math.random() * gridCount),
-          y: Math.floor(Math.random() * gridCount),
-        };
-        const onSnake = snake?.some((segment) => segment.x === candidate.x && segment.y === candidate.y);
-        if (!onSnake) return candidate;
+        const candidate = randomGridPoint();
+        if (!isBlockedTile(candidate, { ignoreFood: true })) return candidate;
       }
     }
 
@@ -166,9 +278,56 @@
       overlayEl.textContent = "Game Over - press Space to restart";
     }
 
+    function chooseThunderStrike() {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const candidate = randomGridPoint();
+        if (!isBlockedTile(candidate, { ignoreThunder: true }) && !inStartingZone(candidate)) {
+          return candidate;
+        }
+      }
+      return null;
+    }
+
+    function updateThunder() {
+      if (thunder.phase === "cooldown") {
+        thunder.cooldown -= 1;
+        if (thunder.cooldown <= 0) {
+          const strike = chooseThunderStrike();
+          if (strike) {
+            thunder = makeThunderState(strike);
+          } else {
+            scheduleNextThunder();
+          }
+        }
+        return;
+      }
+
+      thunder.ticksRemaining -= 1;
+      if (thunder.ticksRemaining > 0) return;
+
+      if (thunder.phase === "warning") {
+        thunder.phase = "active";
+        thunder.ticksRemaining = thunderActiveTicks;
+        return;
+      }
+
+      scheduleNextThunder();
+    }
+
+    function updateCars() {
+      cars.forEach((car) => {
+        if (tickCount % car.moveEvery === 0) {
+          car.progress += car.direction;
+        }
+      });
+    }
+
     function step() {
       if (!running) return;
 
+      tickCount += 1;
+      updateCars();
+      updateThunder();
       direction = nextDirection;
       const head = snake[0];
       const newHead = { x: head.x + direction.x, y: head.y + direction.y };
@@ -178,8 +337,11 @@
         newHead.x < 0 || newHead.x >= gridCount || newHead.y < 0 || newHead.y >= gridCount;
       const bodyToCheck = ateFood ? snake : snake.slice(0, -1);
       const hitSelf = bodyToCheck.some((segment) => segment.x === newHead.x && segment.y === newHead.y);
+      const hitRock = rocks.some((rock) => samePoint(rock, newHead));
+      const hitCar = isCarOnTile(newHead);
+      const hitThunder = thunder.phase === "active" && thunder.strike && samePoint(thunder.strike, newHead);
 
-      if (hitWall || hitSelf) {
+      if (hitWall || hitSelf || hitRock || hitCar || hitThunder) {
         endGame();
         draw();
         return;
@@ -195,18 +357,81 @@
         snake.pop();
       }
 
+      const carMovedIntoSnake = cars.some((car) =>
+        getCarTiles(car).some((tile) => snake.some((segment) => samePoint(segment, tile)))
+      );
+      const thunderHitSnake = thunder.phase === "active" && thunder.strike &&
+        snake.some((segment) => samePoint(segment, thunder.strike));
+
+      if (carMovedIntoSnake || thunderHitSnake) {
+        endGame();
+      }
+
       draw();
     }
 
-    function drawTile(x, y, color) {
-      const padding = 2;
+    function drawTile(x, y, color, padding = 2) {
       ctx.fillStyle = color;
       ctx.fillRect(x * tileSize + padding, y * tileSize + padding, tileSize - padding * 2, tileSize - padding * 2);
+    }
+
+    function drawRock(x, y) {
+      drawTile(x, y, getComputedStyle(document.documentElement).getPropertyValue("--rock"), 4);
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.beginPath();
+      ctx.arc((x + 0.42) * tileSize, (y + 0.42) * tileSize, tileSize * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawCarTile(x, y) {
+      const color = getComputedStyle(document.documentElement).getPropertyValue("--car");
+      drawTile(x, y, color, 3);
+      ctx.fillStyle = "#082f49";
+      ctx.fillRect(x * tileSize + 6, y * tileSize + 7, tileSize - 12, tileSize - 14);
+      ctx.fillStyle = "#e2e8f0";
+      ctx.fillRect(x * tileSize + 5, y * tileSize + tileSize - 9, 5, 3);
+      ctx.fillRect(x * tileSize + tileSize - 10, y * tileSize + tileSize - 9, 5, 3);
+    }
+
+    function drawThunder() {
+      if (!thunder.strike) return;
+      const warningColor = getComputedStyle(document.documentElement).getPropertyValue("--thunder-warning");
+      const activeColor = getComputedStyle(document.documentElement).getPropertyValue("--thunder-active");
+      const centerX = thunder.strike.x * tileSize + tileSize / 2;
+      const centerY = thunder.strike.y * tileSize + tileSize / 2;
+      const radius = thunder.phase === "active" ? tileSize * 0.34 : tileSize * 0.24;
+
+      ctx.strokeStyle = thunder.phase === "active" ? activeColor : warningColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      if (thunder.phase === "active") {
+        ctx.fillStyle = activeColor;
+        ctx.beginPath();
+        ctx.moveTo(centerX - 2, centerY - 10);
+        ctx.lineTo(centerX + 5, centerY - 1);
+        ctx.lineTo(centerX + 1, centerY - 1);
+        ctx.lineTo(centerX + 6, centerY + 10);
+        ctx.lineTo(centerX - 6, centerY + 1);
+        ctx.lineTo(centerX - 1, centerY + 1);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillStyle = warningColor;
+        ctx.fillRect(centerX - 2, centerY - 2, 4, 4);
+      }
     }
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      rocks.forEach((rock) => drawRock(rock.x, rock.y));
+      cars.forEach((car) => {
+        getCarTiles(car).forEach((tile) => drawCarTile(tile.x, tile.y));
+      });
+      drawThunder();
       drawTile(food.x, food.y, getComputedStyle(document.documentElement).getPropertyValue("--food"));
 
       snake.forEach((segment, index) => {
